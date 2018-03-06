@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}
+{% if mode == "registrar" %}
+<title>SpeedSkate &mdash; Registrar</title>
+{% else %}
+<title>SpeedSkate &mdash; Fulfiller</title>
+{% endif %}
+{% endblock %}
+
+{% block js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.slim.js" integrity="sha256-jniDwC1PC9OmGoyPxA9VpGvgwDYyxsMqu5Q4OrF5wNY=" crossorigin="anonymous"></script>
+{% endblock %}
+
+{% block nav %}
+<li class="nav-item">
+  <a class="nav-link socket-status" id="socket-connected" v-if="connected" data-toggle="tooltip" data-placement="bottom" title="Connected to server"></a>
+  <a class="nav-link socket-status" id="socket-disconnected" v-else data-toggle="tooltip" data-placement="bottom" title="Disconnected from server"></a>
+</li>
+<li class="nav-item">
+  <a class="nav-link" href="/logout">Log out</a>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  {% if mode == "registrar" %}
+  <h3 class="row">
+    New skate request
+    <span v-if="enteredSize">
+      : Size [[ enteredSize ]][[ enteredAge == 'youth' ? 'Y' : '' ]] [[ enteredType ]]
+    </span>
+  </h3>
+  <div class="form-row">
+    <div class="col-md-1">
+      <label for="skateSize">Skate size</label>
+      <input type="number" id="skateSize" class="form-control" v-model="enteredSize">
+    </div>
+    <div class="col-auto">
+      <label for="skateAge">Age class</label><br>
+      <div class="btn-group btn-group-toggle" id="skateAge" data-toggle="buttons">
+        <label class="btn btn-secondary" @click="setAge('youth')">
+          <input type="radio" name="age" id="youthAge" autocomplete="off" checked value="youth" v-model="enteredAge"> Youth
+        </label>
+        <label class="btn btn-secondary active" @click="setAge('adult')">
+          <input type="radio" name="age" id="adultAge" autocomplete="off" value="adult" v-model="enteredAge"> Adult
+        </label>
+      </div>
+    </div>
+    <div class="col-auto">
+      <label for="skateType">Skate type</label><br>
+      <div class="btn-group btn-group-toggle" id="skateType" data-toggle="buttons">
+        <label class="btn btn-secondary active" @click="setType('figure')">
+          <input type="radio" name="type" id="figureType" autocomplete="off" checked value="figure" v-model="enteredType"> Figure skate
+        </label>
+        <label class="btn btn-secondary" @click="setType('hockey')">
+          <input type="radio" name="type" id="hockeyType" autocomplete="off" value="hockey" v-model="enteredType"> Hockey skate
+        </label>
+        <label class="btn btn-secondary" @click="setType('speed')">
+          <input type="radio" name="type" id="speedType" autocomplete="off"> Speedskate
+        </label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <label>&nbsp;</label>
+      <br>
+      <button class="btn btn-primary col-md-12" v-if="enteredSize" @click="submitRequest">Submit request</button>
+      <button class="btn btn-primary col-md-12" disabled v-else>Submit request</button>
+    </div>
+  </div>
+  <h3 class="row subhead">
+    Skate queue ([[ queue.length ]] pending request[[ queue.length == 1 ? '' : 's' ]])
+  </h3>
+  <div class="row card-columns">
+    <div class="card" v-for="(skate, idx) in queue" :class="skateClass(skate)">
+      <div class="card-header" :class="{ 'bg-danger': skate.requestTime >= 120000, 'text-white': skate.requestTime >= 120000 }">
+        <div class="skate-number">#[[ idx+1 ]]</div>
+        <div class="skate-time">[[ formatTime(skate.requestTime) ]]</div>
+      </div>
+      <div class="card-body">
+        <h1 class="card-title display-4">[[ skate.size ]][[ skate.age == 'youth' ? 'Y' : '' ]]</h1>
+	<h5 class="card-subtitle">[[ skateString(skate) ]]</h5>
+	<p class="card-text">[[ skate.status == 0 ? 'Unstaged' : 'Staged' ]]</p>
+      </div>
+      <div class="card-footer text-danger" v-if="userAdded.indexOf(skate.id) != -1" @click="cancelRequest(skate.id)">
+        Cancel Request
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <h3 class="row">
+    Unstaged skates ([[ unstagedQueue.length ]] pending request[[ unstagedQueue.length == 1 ? '' : 's' ]])
+  </h3>
+  <div class="row card-columns">
+    <div class="card" v-for="(skate, idx) in unstagedQueue" :class="skateClass(skate)">
+      <div class="card-header" :class="{ 'bg-danger': skate.requestTime >= 120000, 'text-white': skate.requestTime >= 120000 }">
+        <div class="skate-number">#[[ idx+1 ]]</div>
+        <div class="skate-time">[[ formatTime(skate.requestTime) ]]</div>
+      </div>
+      <div class="card-body">
+        <h1 class="card-title display-4">[[ skate.size ]][[ skate.age == 'youth' ? 'Y' : '' ]]</h1>
+	<h5 class="card-subtitle">[[ skateString(skate) ]]</h5>
+      </div>
+      <div class="card-footer text-primary" @click="changeState(skate.id, 1)">
+        Mark staged
+      </div>
+    </div>
+  </div>
+  <h3 class="row subhead">
+    Staged skates ([[ stagedQueue.length ]] pending request[[ stagedQueue.length == 1 ? '' : 's' ]])
+  </h3>
+  <div class="row card-columns">
+    <div class="card" v-for="(skate, idx) in stagedQueue" :class="skateClass(skate)">
+      <div class="card-header" :class="{ 'bg-danger': skate.requestTime >= 120000, 'text-white': skate.requestTime >= 120000 }">
+        <div class="skate-number">#[[ idx+1 ]]</div>
+        <div class="skate-time">[[ formatTime(skate.requestTime) ]]</div>
+      </div>
+      <div class="card-body">
+        <h1 class="card-title display-4">[[ skate.size ]][[ skate.age == 'youth' ? 'Y' : '' ]]</h1>
+	<h5 class="card-subtitle">[[ skateString(skate) ]]</h5>
+      </div>
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item text-danger" :class="skateClass(skate)" @click="changeState(skate.id, 0)">Mark unstaged</li>
+        <li class="list-group-item text-primary" :class="skateClass(skate)" @click="changeState(skate.id, 2)">Mark completed</li>
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block endjs %}
+<script src="static/js/speedskate.js"></script>
+{% endblock %}

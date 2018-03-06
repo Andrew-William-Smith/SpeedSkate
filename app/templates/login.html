@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}
+<title>SpeedSkate — Login</title>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid h-100">
+  <div class="row align-items-center h-100">
+    <div class="col-12 col-md-4 mx-auto">
+      {% if incorrect %}
+        <div class="alert alert-danger">
+          <b>Password incorrect!</b> The password you entered is incorrect.  Please try again.
+        </div>
+      {% endif %}
+
+      <div class="card">
+        <div class="card-header">
+          <h5>Log in to SpeedSkate</h5>
+        </div>
+        <div class="card-body">
+          <form action="" method="post" name="login">
+            <div class="form-group">
+              <label for="password">Password</label>
+              <input type="password" id="password" name="password" class="form-control">
+            </div>
+            <div class="form-group">
+              <label for="modeSelect">User mode</label>
+              <div id="modeSelect">
+                <div class="custom-control custom-radio">
+                  <input type="radio" id="registrarMode" name="registrar" class="custom-control-input">
+                  <label class="custom-control-label" for="registrarMode">
+                    <b>Registrar</b> — You may request skates and modify your own requests.
+                  </label>
+                </div>
+                <div class="custom-control custom-radio">
+                  <input type="radio" id="fulfillerMode" name="fulfiller" class="custom-control-input">
+                  <label class="custom-control-label" for="fulfillerMode">
+                    <b>Fulfiller</b> — You may mark skate requests as fulfilled and modify all requests.
+                  </label>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary col-12" type="submit">Log In</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
